@@ -1,3 +1,4 @@
+const db = require('../db/database');
 const fetchIPData = require("./fetchIPData");
 const insertOrUpdateIPData = require("./insertOrUpdate");
 const {excludeIPs} = require("./config");
@@ -5,23 +6,32 @@ const {excludeIPs} = require("./config");
 let buffer = ''; // Buffer to store partial lines
 let ipsSet = new Set(); // Set to store unique IPs
 
+const isIPKnown = async (ip) => {
+    const result = await db('ip_locations').where('ip', ip).first();
+    return !!result;
+};
 
-const processData = (data) => {
+const processData = async (data) => {
     buffer += data; // Append data to buffer
     const lines = buffer.split('\n');
     buffer = lines.pop(); // Store the incomplete line in buffer
 
-    lines.forEach((line) => {
+    for (const line of lines) {
         const matches = line.match(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g);
         if (matches) {
-            matches.forEach((ip) => {
+            for (const ip of matches) {
                 if (excludeIPs.includes(ip)) {
-                    return;
+                    continue;
                 }
-                ipsSet.add(ip); // Add IP to set
-            });
+                const known = await isIPKnown(ip);
+                if (!known) {
+                    ipsSet.add(ip); // Add IP to set
+                } else{
+                    await db('ip_locations').where('ip', ip).increment('count', 1);
+                }
+            }
         }
-    });
+    }
 
     if (ipsSet.size >= 2) {
         fetchIPData(Array.from(ipsSet).slice(0, 2))
