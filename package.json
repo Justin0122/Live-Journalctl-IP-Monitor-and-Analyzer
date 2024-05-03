@@ -1,0 +1,16 @@
+{
+  "name": "ssh_locations",
+  "version": "0.0.1",
+  "description": "Keep track of where they try to sign in with ssh",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "createdb": "node db/createdb.js",
+    "migrate": "knex migrate:latest --knexfile db/knexfile.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.1",
+    "knex": "^3.1.0",
+    "mysql": "^2.18.1"
+  }
+}
