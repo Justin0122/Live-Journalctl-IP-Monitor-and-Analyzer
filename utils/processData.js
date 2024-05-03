@@ -26,8 +26,13 @@ const processData = async (data) => {
                 const known = await isIPKnown(ip);
                 if (!known) {
                     ipsSet.add(ip); // Add IP to set
-                } else{
-                    await db('ip_locations').where('ip', ip).increment('count', 1);
+                } else {
+                    await db('ip_locations')
+                        .where('ip', ip)
+                        .update({
+                            count: db.raw('count + 1'),
+                            updated_at: db.fn.now()
+                        });
                 }
             }
         }
