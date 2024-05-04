@@ -1,7 +1,8 @@
+const { exec } = require('child_process');
 const db = require('../db/database');
 const insertOrUpdateIPData = require("./insertOrUpdate");
-const {excludeIPs} = require("./config");
-const {lastFetchTime, fetchIPData} = require("./fetchIPData");
+const { excludeIPs } = require("./config");
+const { lastFetchTime, fetchIPData } = require("./fetchIPData");
 
 let buffer = ''; // Buffer to store partial lines
 let ipsSet = new Set(); // Set to store unique IPs
@@ -33,6 +34,23 @@ const processData = async (data) => {
                             count: db.raw('count + 1'),
                             updated_at: db.fn.now()
                         });
+
+                    // Check if IP count exceeds threshold
+                    const { count } = await db('ip_locations').select('count').where('ip', ip).first();
+                    if (count >= 10000) {
+                        // Add firewall rule to block the IP address
+                        exec(`sudo iptables -A INPUT -s ${ip} -j DROP`, (error, stdout, stderr) => {
+                            if (error) {
+                                console.error(`Error blocking IP ${ip}: ${error.message}`);
+                                return;
+                            }
+                            if (stderr) {
+                                console.error(`Error blocking IP ${ip}: ${stderr}`);
+                                return;
+                            }
+                            console.log(`Blocked IP ${ip}`);
+                        });
+                    }
                 }
             }
         }
