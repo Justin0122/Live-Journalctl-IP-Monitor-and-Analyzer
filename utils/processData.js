@@ -37,7 +37,7 @@ const processData = async (data) => {
 
                     // Check if IP count exceeds threshold
                     const { count } = await db('ip_locations').select('count').where('ip', ip).first();
-                    if (count >= 10000) {
+                    if (count >= 5000) {
                         // Add firewall rule to block the IP address
                         exec(`sudo iptables -A INPUT -s ${ip} -j DROP`, (error, stdout, stderr) => {
                             if (error) {
