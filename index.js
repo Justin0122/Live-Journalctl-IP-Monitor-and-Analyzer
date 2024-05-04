@@ -2,6 +2,7 @@ require('dotenv').config();
 const {exec} = require('child_process');
 
 const {size, processData} = require("./utils/processData");
+const {lastFetchTime} = require("./utils/fetchIPData");
 
 const journalctlProcess = exec('/bin/journalctl -u ssh.service --follow');
 
@@ -15,7 +16,7 @@ journalctlProcess.stderr.on('data', (data) => {
 
 const runScript = () => {
     // Check if there are at least 2 IPs collected
-    if (size >= 2) {
+    if (size >= 2 || (size && Date.now() - lastFetchTime >= 60000)) {
         processData('');
     }
 };

@@ -1,6 +1,8 @@
 const insertOrUpdateIPData = require('./insertOrUpdate');
+let lastFetchTime = Date.now();
 const fetchIPData = async (ips) => {
     try {
+        lastFetchTime = Date.now();
         const response = await fetch('http://ip-api.com/batch', {
             method: 'POST', headers: {
                 'Content-Type': 'application/json'
@@ -34,4 +36,7 @@ const fetchIPData = async (ips) => {
     }
 };
 
-module.exports = fetchIPData;
+module.exports = {
+    fetchIPData,
+    lastFetchTime
+}

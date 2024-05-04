@@ -1,7 +1,7 @@
 const db = require('../db/database');
-const fetchIPData = require("./fetchIPData");
 const insertOrUpdateIPData = require("./insertOrUpdate");
 const {excludeIPs} = require("./config");
+const {lastFetchTime, fetchIPData} = require("./fetchIPData");
 
 let buffer = ''; // Buffer to store partial lines
 let ipsSet = new Set(); // Set to store unique IPs
@@ -38,7 +38,7 @@ const processData = async (data) => {
         }
     }
 
-    if (ipsSet.size >= 2) {
+    if (ipsSet.size >= 2 || (ipsSet.size && Date.now() - lastFetchTime >= 60000)) {
         fetchIPData(Array.from(ipsSet).slice(0, 2))
             .then((data) => data.forEach(insertOrUpdateIPData))
             .catch(console.error);
