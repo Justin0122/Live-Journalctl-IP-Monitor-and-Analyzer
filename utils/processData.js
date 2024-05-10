@@ -135,7 +135,9 @@ const processData = async (data) => {
     }
 
     if (ipsSet.size >= 1) {
-        fetchIPData(Array.from(ipsSet).slice(0, 2))
+        const uniqueIPs = Array.from(ipsSet);
+        const unknownIPs = uniqueIPs.filter(async ip => !(await isKnownIp(ip)));
+        fetchIPData(unknownIPs)
             .then((data) => data.forEach(insertOrUpdateIPData))
             .catch(console.error);
         ipsSet.clear();

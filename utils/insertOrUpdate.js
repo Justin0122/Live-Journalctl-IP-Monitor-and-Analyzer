@@ -53,15 +53,9 @@ const insertOrUpdateIPData = async (data) => {
                 };
 
                 await trx.raw(`
-                    INSERT INTO ip_locations (ip, city_id, country_id, region_id, latitude, longitude, count)
-                    VALUES (:ip, :city_id, :country_id, :region_id, :latitude, :longitude, 1) ON DUPLICATE KEY
-                    UPDATE
-                        city_id =
-                    VALUES (city_id), country_id =
-                    VALUES (country_id), region_id =
-                    VALUES (region_id), latitude =
-                    VALUES (latitude), longitude =
-                    VALUES (longitude), count = count + 1, updated_at = NOW()
+                    INSERT INTO ip_locations (ip, city_id, country_id, region_id, latitude, longitude, count, updated_at)
+                    VALUES (:ip, :city_id, :country_id, :region_id, :latitude, :longitude, 1, NOW())
+                    ON DUPLICATE KEY UPDATE count = count + 1, updated_at = NOW()
                 `, insertData);
             }
         });
@@ -69,8 +63,5 @@ const insertOrUpdateIPData = async (data) => {
         console.error('Error inserting or updating IP data:', error);
     }
 };
-
-module.exports = insertOrUpdateIPData;
-
 
 module.exports = insertOrUpdateIPData;
