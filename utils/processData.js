@@ -12,22 +12,10 @@ const isKnown = async (table, conditions) => {
     return !!result;
 };
 
-const isKnownIp = async (ip) => {
-    const result = await db('ip_locations').where('ip', ip).first();
-    return !!result;
-};
-
-const isKnownCommand = async (command) => {
-    return await isKnown('commands', { command });
-};
-
-const isKnownUsername = async (username) => {
-    return await isKnown('users', { username });
-};
-
-const isKnownPassword = async (password) => {
-    return await isKnown('passwords', { password });
-};
+const isKnownIp = (ip) => isKnown('ip_locations', { ip });
+const isKnownCommand = (command) => isKnown('commands', { command });
+const isKnownUsername = (username) => isKnown('users', { username });
+const isKnownPassword = (password) => isKnown('passwords', { password });
 
 const processData = async (data) => {
     buffer += data; // Append data to buffer
@@ -49,11 +37,18 @@ const processData = async (data) => {
             const isIPKnown = await isKnownIp(ip);
             if (!isIPKnown) {
                 ipsSet.add(ip); // Add IP to set
-                const [newIp] = await db('ip_locations').insert({ ip: ip, count: 1 }, ['id']);
+                let [newIp] = await db('ip_locations').insert({ ip: ip, count: 1 }, ['id']);
+                newIp = await db('ip_locations').where('ip', ip).first();
                 ip_id = newIp.id;
             } else {
                 const knownIP = await db('ip_locations').where('ip', ip).first();
+                console.log(`IP: ${knownIP}`);
                 ip_id = knownIP.id;
+                // Ensure ip_id is defined
+                if (!ip_id) {
+                    console.error(`Error: IP ID not found for IP ${ip}`);
+                    continue; // Skip processing this line
+                }
                 await db('ip_locations')
                     .where('ip', ip)
                     .update({
@@ -78,6 +73,7 @@ const processData = async (data) => {
                     });
                 }
             }
+
 
             // Log the command, username, and password if they exist
             if (commandMatches) {
@@ -141,7 +137,7 @@ const processData = async (data) => {
         }
     }
 
-    if (ipsSet.size >= 2 || (ipsSet.size && Date.now() - lastFetchTime >= 60000)) {
+    if (ipsSet.size >= 1 || (ipsSet.size && Date.now() - lastFetchTime >= 60000)) {
         fetchIPData(Array.from(ipsSet).slice(0, 2))
             .then((data) => data.forEach(insertOrUpdateIPData))
             .catch(console.error);
