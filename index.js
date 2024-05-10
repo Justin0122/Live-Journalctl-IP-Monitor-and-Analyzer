@@ -4,14 +4,13 @@ const {exec} = require('child_process');
 const {size, processData} = require("./utils/processData");
 const {lastFetchTime} = require("./utils/fetchIPData");
 
-const journalctlProcess = exec('/bin/journalctl -u ssh.service --follow');
+const sshesameProcess = exec(process.env.EXEC);
 
+// Start sshesame process
+sshesameProcess.stdout.on('data', processData);
 
-// Start journalctl process
-journalctlProcess.stdout.on('data', processData);
-
-journalctlProcess.stderr.on('data', (data) => {
-    console.error('Error running journalctl:', data);
+sshesameProcess.stderr.on('data', (data) => {
+    console.error('Error running sshesame:', data);
 });
 
 const runScript = () => {

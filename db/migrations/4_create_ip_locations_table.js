@@ -1,6 +1,7 @@
 exports.up = function(knex) {
     return knex.schema.createTable('ip_locations', table => {
-        table.string('ip').primary();
+        table.increments();
+        table.string('ip').notNullable();
         table.integer('city_id').unsigned().references('id').inTable('cities');
         table.integer('region_id').unsigned().references('id').inTable('regions');
         table.integer('country_id').unsigned().references('id').inTable('countries');
