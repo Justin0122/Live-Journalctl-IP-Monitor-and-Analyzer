@@ -42,7 +42,6 @@ const processData = async (data) => {
                 ip_id = newIp.id;
             } else {
                 const knownIP = await db('ip_locations').where('ip', ip).first();
-                console.log(`IP: ${knownIP}`);
                 ip_id = knownIP.id;
                 // Ensure ip_id is defined
                 if (!ip_id) {
