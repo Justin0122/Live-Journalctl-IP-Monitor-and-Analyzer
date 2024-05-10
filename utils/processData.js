@@ -37,13 +37,11 @@ const processData = async (data) => {
             const isIPKnown = await isKnownIp(ip);
             if (!isIPKnown) {
                 ipsSet.add(ip); // Add IP to set
-                let [newIp] = await db('ip_locations').insert({ ip: ip, count: 1 }, ['id']);
-                newIp = await db('ip_locations').where('ip', ip).first();
+                const [newIp] = await db('ip_locations').insert({ ip: ip, count: 1 }, ['id']);
                 ip_id = newIp.id;
             } else {
                 const knownIP = await db('ip_locations').where('ip', ip).first();
                 ip_id = knownIP.id;
-                // Ensure ip_id is defined
                 if (!ip_id) {
                     console.error(`Error: IP ID not found for IP ${ip}`);
                     continue; // Skip processing this line
@@ -136,7 +134,7 @@ const processData = async (data) => {
         }
     }
 
-    if (ipsSet.size >= 1 || (ipsSet.size && Date.now() - lastFetchTime >= 60000)) {
+    if (ipsSet.size >= 1) {
         fetchIPData(Array.from(ipsSet).slice(0, 2))
             .then((data) => data.forEach(insertOrUpdateIPData))
             .catch(console.error);
