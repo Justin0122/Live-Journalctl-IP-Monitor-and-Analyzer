@@ -25,6 +25,7 @@ const processData = async (data) => {
     buffer = lines.pop();
 
     for (const line of lines) {
+        console.log("Line:", line);
         const ipMatches = line.match(/(\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b)/);
         const commandMatches = line.match(/input: "(.+?)"/);
         const usernameMatches = line.match(/user "(.+?)" /);
@@ -37,12 +38,14 @@ const processData = async (data) => {
             }
             const isIPKnown = await isKnownIp(ip);
             if (!isIPKnown) {
+                console.log("IP:", ip);
                 ipsSet.add(ip);
                 // Store the log in tempLogs
                 tempLogs[ip] = tempLogs[ip] || [];
                 tempLogs[ip].push({commandMatches, usernameMatches, passwordMatches});
             } else {
                 const knownIP = await db('ip_locations').where('ip', ip).first();
+                console.log("Known IP:", knownIP);
                 if (!knownIP || !knownIP.latitude || !knownIP.longitude) {
                     console.error(`Error: IP ID or location data not found for IP ${ip}`);
                     continue;
@@ -50,6 +53,7 @@ const processData = async (data) => {
                 await updateIP(ip);
                 // Process the stored logs for this IP
                 if (tempLogs[ip]) {
+                    console.log("Temp logs:", tempLogs[ip]);
                     for (const log of tempLogs[ip]) {
                         if (log.commandMatches) {
                             console.log("Command matches:", commandMatches);
@@ -68,7 +72,7 @@ const processData = async (data) => {
         }
     }
 
-    if (ipsSet.size >= 5 || (ipsSet.size && Date.now() - lastFetchTime >= 60000)) {
+    if (ipsSet.size >= 1 || (ipsSet.size && Date.now() - lastFetchTime >= 60000)) {
         const unknownIPs = Array.from(ipsSet).filter(async ip => !(await isKnownIp(ip)));
         fetchIPData(unknownIPs)
             .then((data) => data.forEach(insertOrUpdateIPData))
@@ -77,6 +81,7 @@ const processData = async (data) => {
     }
 };
 const handleCommand = async (command, ip_id) => {
+    console.log("Command:", command);
     const isCommandKnown = await isKnownCommand(command);
     if (!isCommandKnown) {
         await db('commands').insert({command, ip_id});
