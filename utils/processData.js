@@ -12,15 +12,17 @@ const isKnown = async (table, conditions) => {
     return !!result;
 };
 
-const isKnownIp = (ip) => isKnown('ip_locations', { ip });
-const isKnownCommand = (command) => isKnown('commands', { command });
-const isKnownUsername = (username) => isKnown('users', { username });
-const isKnownPassword = (password) => isKnown('passwords', { password });
+const isKnownIp = (ip) => isKnown('ip_locations', {ip});
+const isKnownCommand = (command) => isKnown('commands', {command});
+const isKnownUsername = (username) => isKnown('users', {username});
+const isKnownPassword = (password) => isKnown('passwords', {password});
+
+let tempLogs = {}; // Temporary storage for logs
 
 const processData = async (data) => {
-    buffer += data; // Append data to buffer
+    buffer += data;
     const lines = buffer.split('\n');
-    buffer = lines.pop(); // Store the incomplete line in buffer
+    buffer = lines.pop();
 
     for (const line of lines) {
         const ipMatches = line.match(/(\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b)/);
@@ -33,117 +35,90 @@ const processData = async (data) => {
             if (excludeIPs.includes(ip)) {
                 continue;
             }
-            let ip_id = null; // Initialize ip_id
             const isIPKnown = await isKnownIp(ip);
             if (!isIPKnown) {
-                ipsSet.add(ip); // Add IP to set
-                const [newIp] = await db('ip_locations').insert({ ip: ip, count: 1 }, ['id']);
-                ip_id = newIp.id;
+                ipsSet.add(ip);
+                // Store the log in tempLogs
+                tempLogs[ip] = tempLogs[ip] || [];
+                tempLogs[ip].push({commandMatches, usernameMatches, passwordMatches});
             } else {
                 const knownIP = await db('ip_locations').where('ip', ip).first();
-                ip_id = knownIP.id;
-                if (!ip_id) {
-                    console.error(`Error: IP ID not found for IP ${ip}`);
-                    continue; // Skip processing this line
+                if (!knownIP || !knownIP.latitude || !knownIP.longitude) {
+                    console.error(`Error: IP ID or location data not found for IP ${ip}`);
+                    continue;
                 }
-                await db('ip_locations')
-                    .where('ip', ip)
-                    .update({
-                        count: db.raw('count + 1'),
-                        updated_at: db.fn.now()
-                    });
-
-                // Check if IP count exceeds threshold
-                const {count} = await db('ip_locations').select('count').where('ip', ip).first();
-                if (count >= 5000) {
-                    // Add firewall rule to block the IP address
-                    exec(`sudo iptables -A INPUT -s ${ip} -j DROP`, (error, stdout, stderr) => {
-                        if (error) {
-                            console.error(`Error blocking IP ${ip}: ${error.message}`);
-                            return;
+                await updateIP(ip);
+                // Process the stored logs for this IP
+                if (tempLogs[ip]) {
+                    for (const log of tempLogs[ip]) {
+                        if (log.commandMatches) {
+                            await handleCommand(log.commandMatches[1], knownIP.id);
                         }
-                        if (stderr) {
-                            console.error(`Error blocking IP ${ip}: ${stderr}`);
-                            return;
+                        if (log.usernameMatches) {
+                            await handleUsername(log.usernameMatches[1], knownIP.id);
                         }
-                        console.log(`Blocked IP ${ip}`);
-                    });
-                }
-            }
-
-
-            // Log the command, username, and password if they exist
-            if (commandMatches) {
-                console.log(`Command: ${commandMatches[1]}`);
-                const isCommandKnown = await isKnownCommand(commandMatches[1]);
-                if (!isCommandKnown) {
-                    // Insert command into the database
-                    await db('commands').insert({
-                        command: commandMatches[1],
-                        ip_id: ip_id
-                    });
-                } else {
-                    // Update command count
-                    await db('commands')
-                        .where('command', commandMatches[1])
-                        .update({
-                            count: db.raw('count + 1'),
-                            updated_at: db.fn.now()
-                        });
-                }
-            }
-            if (usernameMatches) {
-                console.log(`Username: ${usernameMatches[1]}`);
-                console.log(`IP ID: ${ip_id}`);
-                const isUsernameKnown = await isKnownUsername(usernameMatches[1]);
-                if (!isUsernameKnown) {
-                    // Insert username into the database
-                    await db('users').insert({
-                        username: usernameMatches[1],
-                        ip_id: ip_id
-                    });
-                } else {
-                    // Update username count
-                    await db('users')
-                        .where('username', usernameMatches[1])
-                        .update({
-                            count: db.raw('count + 1'),
-                            updated_at: db.fn.now()
-                        });
-                }
-            }
-            if (passwordMatches) {
-                console.log(`Password: ${passwordMatches[1]}`);
-                const isPasswordKnown = await isKnownPassword(passwordMatches[1]);
-                if (!isPasswordKnown) {
-                    // Insert password into the database
-                    await db('passwords').insert({
-                        password: passwordMatches[1],
-                        ip_id: ip_id
-                    });
-                } else {
-                    // Update password count
-                    await db('passwords')
-                        .where('password', passwordMatches[1])
-                        .update({
-                            count: db.raw('count + 1'),
-                            updated_at: db.fn.now()
-                        });
+                        if (log.passwordMatches) {
+                            await handlePassword(log.passwordMatches[1], knownIP.id);
+                        }
+                    }
+                    delete tempLogs[ip]; // Remove the processed logs
                 }
             }
         }
     }
 
-    if (ipsSet.size >= 5 || (ipsSet.size && Date.now() - lastFetchTime >= 60000)) {
-        const uniqueIPs = Array.from(ipsSet);
-        const unknownIPs = uniqueIPs.filter(async ip => !(await isKnownIp(ip)));
+    if (ipsSet.size >= 1 || (ipsSet.size && Date.now() - lastFetchTime >= 60000)) {
+        const unknownIPs = Array.from(ipsSet).filter(async ip => !(await isKnownIp(ip)));
         fetchIPData(unknownIPs)
             .then((data) => data.forEach(insertOrUpdateIPData))
             .catch(console.error);
         ipsSet.clear();
     }
 };
+const handleCommand = async (command, ip_id) => {
+    const isCommandKnown = await isKnownCommand(command);
+    if (!isCommandKnown) {
+        await db('commands').insert({command, ip_id});
+    } else {
+        await db('commands').where('command', command).update({count: db.raw('count + 1'), updated_at: db.fn.now()});
+    }
+};
 
+const handleUsername = async (username, ip_id) => {
+    const isUsernameKnown = await isKnownUsername(username);
+    if (!isUsernameKnown) {
+        await db('users').insert({username, ip_id});
+    } else {
+        await db('users').where('username', username).update({count: db.raw('count + 1'), updated_at: db.fn.now()});
+    }
+};
+
+const handlePassword = async (password, ip_id) => {
+    const isPasswordKnown = await isKnownPassword(password);
+    if (!isPasswordKnown) {
+        await db('passwords').insert({password, ip_id});
+    } else {
+        await db('passwords').where('password', password).update({count: db.raw('count + 1'), updated_at: db.fn.now()});
+    }
+};
+
+const updateIP = async (ip) => {
+    await db('ip_locations').where('ip', ip).update({count: db.raw('count + 1'), updated_at: db.fn.now()});
+    const {count} = await db('ip_locations').select('count').where('ip', ip).first();
+    if (count >= 5000) {
+        exec(`sudo iptables -A INPUT -s ${ip} -j DROP`, (error, stdout, stderr) => {
+            if (error) {
+                console.error(`Error blocking IP ${ip}: ${error.message}`);
+                return;
+            }
+            if (stderr) {
+                console.error(`Error blocking IP ${ip}: ${stderr}`);
+                return;
+            }
+            console.log(`Blocked IP ${ip}`);
+        });
+    }
+};
 module.exports = {
     processData,
     ipsSet
