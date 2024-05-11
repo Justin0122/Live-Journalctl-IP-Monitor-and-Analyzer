@@ -8,38 +8,40 @@ const insertOrUpdateIPData = async (data) => {
     try {
         await db.transaction(async (trx) => {
             if (data.city) {
+                await trx.raw(`
+                    INSERT INTO cities (name) VALUES (:name)
+                    ON DUPLICATE KEY UPDATE name = VALUES(name)
+                `, { name: data.city });
                 const [city] = await trx('cities').where('name', data.city);
-                if (!city) {
-                    [city_id] = await trx('cities').insert({name: data.city});
-                } else {
-                    city_id = city.id;
-                }
+                city_id = city.id;
             }
 
             if (data.country) {
+                await trx.raw(`
+                    INSERT INTO countries (name, code, code_iso3, capital) 
+                    VALUES (:name, :code, :code_iso3, :capital)
+                    ON DUPLICATE KEY UPDATE name = VALUES(name)
+                `, {
+                    name: data.country,
+                    code: data.region,
+                    code_iso3: data.countryCode,
+                    capital: ''
+                });
                 const [country] = await trx('countries').where('name', data.country);
-                if (!country) {
-                    [country_id] = await trx('countries').insert({
-                        name: data.country,
-                        code: data.region,
-                        code_iso3: data.countryCode,
-                        capital: ''
-                    });
-                } else {
-                    country_id = country.id;
-                }
+                country_id = country.id;
             }
 
             if (data.regionName) {
+                await trx.raw(`
+                    INSERT INTO regions (name, code) 
+                    VALUES (:name, :code)
+                    ON DUPLICATE KEY UPDATE name = VALUES(name)
+                `, {
+                    name: data.regionName,
+                    code: data.region
+                });
                 const [region] = await trx('regions').where('name', data.regionName);
-                if (!region) {
-                    [region_id] = await trx('regions').insert({
-                        name: data.regionName,
-                        code: data.region,
-                    });
-                } else {
-                    region_id = region.id;
-                }
+                region_id = region.id;
             }
 
             if (data.ip) {
