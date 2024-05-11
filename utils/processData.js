@@ -52,6 +52,7 @@ const processData = async (data) => {
                 if (tempLogs[ip]) {
                     for (const log of tempLogs[ip]) {
                         if (log.commandMatches) {
+                            console.log("Command matches:", commandMatches);
                             await handleCommand(log.commandMatches[1], knownIP.id);
                         }
                         if (log.usernameMatches) {
