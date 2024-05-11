@@ -56,7 +56,7 @@ const processData = async (data) => {
         }
     }
 
-    if (ipsSet.size >= 1 || (ipsSet.size && Date.now() - lastFetchTime >= 60000)) {
+    if (ipsSet.size >= 5 || (ipsSet.size && Date.now() - lastFetchTime >= 60000)) {
         const unknownIPs = Array.from(ipsSet).filter(async ip => !(await isKnownIp(ip)));
         fetchIPData(unknownIPs)
             .then((data) => data.forEach(insertOrUpdateIPData))
