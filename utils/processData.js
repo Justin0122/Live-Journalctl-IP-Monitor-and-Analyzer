@@ -54,27 +54,9 @@ const processData = async (data) => {
                     continue;
                 }
                 await updateIP(ip);
-                // Process the stored logs for this IP
-                if (tempLogs[ip]) {
-                    console.log("Temp logs for IP:", ip, tempLogs[ip]);
-                    for (const log of tempLogs[ip]) {
-                        // Add logging for processing each log entry
-                        console.log("Processing log entry:", log);
-                        if (log.commandMatches) {
-                            console.log("Command matches:", log.commandMatches);
-                            await handleCommand(log.commandMatches[1], knownIP.id);
-                        }
-                        if (log.usernameMatches) {
-                            await handleUsername(log.usernameMatches[1], knownIP.id);
-                        }
-                        if (log.passwordMatches) {
-                            await handlePassword(log.passwordMatches[1], knownIP.id);
-                        }
-                    }
-                    delete tempLogs[ip]; // Remove the processed logs
-                } else {
-                    console.log("No temp logs for IP:", ip);
-                }
+
+                tempLogs[ip] = tempLogs[ip] || [];
+                tempLogs[ip].push({commandMatches, usernameMatches, passwordMatches});
             }
         }
     }
