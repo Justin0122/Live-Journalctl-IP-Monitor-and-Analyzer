@@ -24,6 +24,7 @@ const processData = async (data) => {
     buffer = lines.pop();
 
     for (const line of lines) {
+        console.log(line);
         const ipMatches = line.match(/(\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b)/);
         const commandMatches = line.match(/input: "(.+?)"/);
         const usernameMatches = line.match(/user "(.+?)" /);
