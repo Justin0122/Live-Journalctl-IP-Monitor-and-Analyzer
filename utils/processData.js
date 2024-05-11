@@ -36,10 +36,13 @@ const processData = async (data) => {
             if (excludeIPs.includes(ip)) {
                 continue;
             }
+
+            // Always add IP to set
+            ipsSet.add(ip);
+
             const isIPKnown = await isKnownIp(ip);
             if (!isIPKnown) {
                 console.log("IP:", ip);
-                ipsSet.add(ip);
                 // Store the log in tempLogs
                 tempLogs[ip] = tempLogs[ip] || [];
                 tempLogs[ip].push({commandMatches, usernameMatches, passwordMatches});
@@ -53,10 +56,12 @@ const processData = async (data) => {
                 await updateIP(ip);
                 // Process the stored logs for this IP
                 if (tempLogs[ip]) {
-                    console.log("Temp logs:", tempLogs[ip]);
+                    console.log("Temp logs for IP:", ip, tempLogs[ip]);
                     for (const log of tempLogs[ip]) {
+                        // Add logging for processing each log entry
+                        console.log("Processing log entry:", log);
                         if (log.commandMatches) {
-                            console.log("Command matches:", commandMatches);
+                            console.log("Command matches:", log.commandMatches);
                             await handleCommand(log.commandMatches[1], knownIP.id);
                         }
                         if (log.usernameMatches) {
@@ -67,14 +72,17 @@ const processData = async (data) => {
                         }
                     }
                     delete tempLogs[ip]; // Remove the processed logs
+                } else {
+                    console.log("No temp logs for IP:", ip);
                 }
             }
         }
     }
 
+    // Fetch data for all IPs when conditions are met
     if (ipsSet.size >= 1 || (ipsSet.size && Date.now() - lastFetchTime >= 60000)) {
-        const unknownIPs = Array.from(ipsSet).filter(async ip => !(await isKnownIp(ip)));
-        fetchIPData(unknownIPs)
+        const allIPs = Array.from(ipsSet);
+        fetchIPData(allIPs)
             .then((data) => data.forEach(insertOrUpdateIPData))
             .catch(console.error);
         ipsSet.clear();
