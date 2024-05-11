@@ -17,17 +17,15 @@ const isKnownCommand = (command) => isKnown('commands', {command});
 const isKnownUsername = (username) => isKnown('users', {username});
 const isKnownPassword = (password) => isKnown('passwords', {password});
 
-let tempLogs = {}; // Temporary storage for logs
-
 const processData = async (data) => {
     buffer += data;
     const lines = buffer.split('\n');
     buffer = lines.pop();
 
     for (const line of lines) {
-        console.log("Line:", line);
         const ipMatches = line.match(/(\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b)/);
         const commandMatches = line.match(/input: "(.+?)"/);
+        console.log(commandMatches);
         const usernameMatches = line.match(/user "(.+?)" /);
         const passwordMatches = line.match(/password "(.+?)"/);
 
@@ -36,42 +34,42 @@ const processData = async (data) => {
             if (excludeIPs.includes(ip)) {
                 continue;
             }
-
-            // Always add IP to set
-            ipsSet.add(ip);
-
+            let ip_id = null;
             const isIPKnown = await isKnownIp(ip);
             if (!isIPKnown) {
-                console.log("IP:", ip);
-                // Store the log in tempLogs
-                tempLogs[ip] = tempLogs[ip] || [];
-                tempLogs[ip].push({commandMatches, usernameMatches, passwordMatches});
+                ipsSet.add(ip);
             } else {
                 const knownIP = await db('ip_locations').where('ip', ip).first();
-                console.log("Known IP:", knownIP);
-                if (!knownIP || !knownIP.latitude || !knownIP.longitude) {
-                    console.error(`Error: IP ID or location data not found for IP ${ip}`);
+                ip_id = knownIP.id;
+                if (!ip_id) {
+                    console.error(`Error: IP ID not found for IP ${ip}`);
                     continue;
                 }
                 await updateIP(ip);
+            }
 
-                tempLogs[ip] = tempLogs[ip] || [];
-                tempLogs[ip].push({commandMatches, usernameMatches, passwordMatches});
+            if (commandMatches && ip_id) {
+                await handleCommand(commandMatches[1], ip_id);
+            }
+            if (usernameMatches && ip_id) {
+                await handleUsername(usernameMatches[1], ip_id);
+            }
+            if (passwordMatches && ip_id) {
+                await handlePassword(passwordMatches[1], ip_id);
             }
         }
     }
 
-    // Fetch data for all IPs when conditions are met
     if (ipsSet.size >= 1 || (ipsSet.size && Date.now() - lastFetchTime >= 60000)) {
-        const allIPs = Array.from(ipsSet);
-        fetchIPData(allIPs)
+        const unknownIPs = Array.from(ipsSet).filter(async ip => !(await isKnownIp(ip)));
+        fetchIPData(unknownIPs)
             .then((data) => data.forEach(insertOrUpdateIPData))
             .catch(console.error);
         ipsSet.clear();
     }
 };
+
 const handleCommand = async (command, ip_id) => {
-    console.log("Command:", command);
     const isCommandKnown = await isKnownCommand(command);
     if (!isCommandKnown) {
         await db('commands').insert({command, ip_id});
